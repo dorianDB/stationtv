@@ -1,0 +1,254 @@
+@startuml StationTV_Sequence_Batch_Transcription
+!theme plain
+title Station TV - Séquence de Transcription Batch Multi-Process
+
+actor Utilisateur
+participant "RunBatchWhisper.py\n(Script)" as Script
+participant "FileHandler" as FileHandler
+participant "CPUAffinityManager" as Affinity
+participant "ModelManager" as ModelMgr
+participant "SystemMonitor" as Monitor
+participant "WhisperTranscriber" as Transcriber
+participant "MetricsCalculator" as Metrics
+participant "QoSReporter" as Reporter
+database "Fichiers Audio\n(bdd/)" as Audio
+database "Fichiers de sortie\n(output/)" as Output
+
+== Phase 1: Initialisation ==
+
+Utilisateur -> Script: python RunBatchWhisper.py --config config.yaml
+activate Script
+
+Script -> Script: Charger configuration YAML
+note right
+  - Nombre de processus parallèles
+  - Modèle Whisper (small, medium, large)
+  - Formats de sortie (TXT, SRT, JSON)
+  - Paramètres QoS
+end note
+
+Script -> ModelMgr: __init__(device="cpu")
+activate ModelMgr
+ModelMgr --> Script: ModelManager créé
+deactivate ModelMgr
+
+Script -> ModelMgr: validate_memory_availability(model, nb_process, ram_total)
+activate ModelMgr
+ModelMgr -> ModelMgr: estimate_ram_usage()
+ModelMgr --> Script: is_valid=True/False
+deactivate ModelMgr
+
+alt Mémoire insuffisante
+    Script -> Utilisateur: ❌ Erreur: RAM insuffisante
+    Script --> Utilisateur: Réduire nb_processus ou choisir modèle plus petit
+else Mémoire suffisante
+    Script -> Script: Continuer
+end
+
+== Phase 2: Scan des fichiers audio ==
+
+Script -> FileHandler: scan_audio_files(directory="bdd/", extensions=[".mp3", ".wav"])
+activate FileHandler
+
+FileHandler -> Audio: Parcourir répertoire
+activate Audio
+Audio --> FileHandler: Liste des fichiers trouvés
+deactivate Audio
+
+loop Pour chaque fichier audio
+    FileHandler -> FileHandler: get_audio_duration(file_path)
+    note right: Utilise ffprobe pour lire la durée
+    FileHandler -> FileHandler: validate_audio_file(file_path)
+end
+
+FileHandler --> Script: List[Dict] avec {path, duration, size}
+deactivate FileHandler
+
+Script -> FileHandler: create_audio_objects(scan_results)
+activate FileHandler
+FileHandler --> Script: List[Audio(path, duree)]
+deactivate FileHandler
+
+Script -> Script: Afficher statistiques
+note right
+  - Nombre total de fichiers
+  - Durée totale (heures)
+  - Taille totale (Go)
+end note
+
+== Phase 3: Équilibrage de charge ==
+
+Script -> Affinity: equilibrage_charge(objets_audio, nb_processus=3)
+activate Affinity
+
+Affinity -> Affinity: glouton_n_listes(objets, n)
+note right
+  Algorithme glouton:
+  1. Trier par durée décroissante
+  2. Placer chaque fichier dans
+     la liste avec la plus petite somme
+end note
+
+Affinity --> Script: List[List[Audio]] - 3 listes équilibrées
+deactivate Affinity
+
+Script -> Script: Assigner cœurs CPU à chaque processus
+note right
+  Processus 1: cores [0-11]
+  Processus 2: cores [12-23]
+  Processus 3: cores [24-35]
+end note
+
+== Phase 4: Démarrage du monitoring ==
+
+Script -> Monitor: __init__(output_dir="output/reports", interval=2)
+activate Monitor
+Monitor --> Script: SystemMonitor créé
+deactivate Monitor
+
+Script -> Monitor: start()
+activate Monitor
+
+Monitor -> Monitor: monitor_cpu_usage() [Thread 1]
+activate Monitor
+note right: Enregistre CPU% toutes les 2s
+Monitor -> Output: monitoring_cpu.csv
+
+Monitor -> Monitor: monitor_memory_usage() [Thread 2]
+activate Monitor
+note right: Enregistre RAM% toutes les 2s
+Monitor -> Output: monitoring_memory.csv
+deactivate Monitor
+deactivate Monitor
+
+Script -> Metrics: start_session()
+activate Metrics
+Metrics -> Metrics: start_time = time.time()
+deactivate Metrics
+
+== Phase 5: Transcription Multi-Process ==
+
+par Processus 1 (cores 0-11)
+    Script -> Transcriber: __init__(config)
+    activate Transcriber
+    
+    Transcriber -> ModelMgr: load_model("small")
+    activate ModelMgr
+    ModelMgr -> ModelMgr: Charger modèle Whisper
+    ModelMgr --> Transcriber: whisper_model
+    deactivate ModelMgr
+    
+    loop Pour chaque fichier dans Liste 1
+        Transcriber -> Affinity: set_cpu_affinity([0-11])
+        activate Affinity
+        Affinity --> Transcriber: Affinité définie
+        deactivate Affinity
+        
+        Transcriber -> Transcriber: transcribe_on_specific_cores(audio_path, cores)
+        activate Transcriber
+        note right
+          1. Charger audio avec whisper.load_audio()
+          2. Appeler model.transcribe()
+          3. Mesurer temps de traitement
+        end note
+        Transcriber --> Transcriber: result = {text, segments, language}
+        deactivate Transcriber
+        
+        alt Transcription réussie
+            Transcriber -> Output: create_txt_file(result, output_file)
+            Transcriber -> Output: create_srt_file(segments, output_file)
+            
+            Transcriber -> Metrics: add_transcription(audio_duration, processing_time, success=True)
+            activate Metrics
+            Metrics -> Metrics: Ajouter aux statistiques
+            deactivate Metrics
+        else Erreur
+            Transcriber -> Metrics: add_transcription(audio_duration, processing_time, success=False)
+        end
+    end
+    
+    deactivate Transcriber
+
+else Processus 2 (cores 12-23)
+    Script -> Transcriber: Même séquence en parallèle
+    note right: Traite Liste 2 sur cores 12-23
+
+else Processus 3 (cores 24-35)
+    Script -> Transcriber: Même séquence en parallèle
+    note right: Traite Liste 3 sur cores 24-35
+end
+
+== Phase 6: Arrêt du monitoring ==
+
+Script -> Monitor: stop()
+activate Monitor
+Monitor -> Monitor: monitoring_active = False
+Monitor -> Monitor: Attendre fin des threads
+Monitor --> Script: Monitoring arrêté
+deactivate Monitor
+
+Script -> Metrics: end_session()
+activate Metrics
+Metrics -> Metrics: end_time = time.time()
+deactivate Metrics
+
+== Phase 7: Génération des rapports QoS ==
+
+Script -> Metrics: get_summary()
+activate Metrics
+Metrics -> Metrics: calculate_throughput()
+Metrics -> Metrics: calculate_average_processing_time()
+Metrics -> Metrics: calculate_success_rate()
+Metrics --> Script: Dict[metrics]
+deactivate Metrics
+
+Script -> Reporter: __init__(output_dir="output/reports")
+activate Reporter
+Reporter --> Script: QoSReporter créé
+deactivate Reporter
+
+Script -> Reporter: generate_full_report(cpu_file, memory_file, metrics)
+activate Reporter
+
+Reporter -> Reporter: generate_plots(cpu_file, memory_file)
+note right
+  Génère graphiques PNG:
+  - CPU Usage over Time
+  - Memory Usage over Time
+  - Matplotlib + pandas
+end note
+Reporter -> Output: save_plots.png
+
+Reporter -> Reporter: generate_text_report(metrics, output_file)
+note right
+  Rapport textuel avec:
+  - Throughput: 5.2×
+  - Temps moyen: 45.3s/fichier
+  - Taux de réussite: 99.5%
+  - Fichiers traités: 1250
+end note
+Reporter -> Output: qos_report.txt
+
+Reporter --> Script: Rapport généré
+deactivate Reporter
+
+Script -> Metrics: export_to_csv("output/metrics.csv")
+activate Metrics
+Metrics -> Output: Exporter métriques détaillées
+deactivate Metrics
+
+== Phase 8: Résultats ==
+
+Script -> Utilisateur: ✅ Transcription batch terminée
+note right
+  Résumé affiché:
+  - Fichiers traités: 1250/1250
+  - Durée totale: 156 heures audio
+  - Temps réel: 30 heures
+  - Throughput: 5.2×
+  - Rapports générés dans output/
+end note
+
+deactivate Script
+
+@enduml

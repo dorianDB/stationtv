@@ -1,0 +1,35 @@
+# Station TV - Transcription Audio Haute Performance
+# Requirements Python 3.10+
+
+# Core AI/ML
+openai-whisper
+torch
+torchaudio
+
+# Audio processing
+ffmpeg-python
+librosa
+mutagen
+pydub
+
+# Data processing
+numpy
+pandas
+
+# System monitoring
+psutil
+
+# Visualization
+matplotlib
+seaborn
+
+# Configuration
+PyYAML
+
+# Testing
+pytest
+pytest-cov
+
+# Utilities
+tqdm
+python-dateutil

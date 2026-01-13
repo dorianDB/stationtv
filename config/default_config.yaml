@@ -1,0 +1,172 @@
+# Station TV - Configuration par défaut
+# Dell Precision 5820 - 256 Go RAM - Xeon W-2295 (18 cores / 36 threads)
+
+# ========================================
+# CONFIGURATION MATÉRIELLE
+# ========================================
+hardware:
+  cpu_cores: 24              # Nombre de cœurs physiques
+  cpu_threads: 32            # Nombre de threads disponibles
+  max_parallel_processes: 3  # Nombre max de processus Whisper simultanés
+  ram_total_gb: 32          # RAM totale installée
+  ram_max_usage_percent: 90  # Utilisation RAM maximale autorisée (%)
+
+# ========================================
+# CONFIGURATION WHISPER
+# ========================================
+whisper:
+  model: "medium"            # Modèle: tiny, base, small, medium, large
+  language: "fr"             # Langue principale (français)
+  device: "cpu"              # cpu ou cuda (GPU désactivé pour stabilité)
+  
+  # Répartition des cœurs par processus
+  # Format: liste de listes [[core1, core2], [core3, core4], ...]
+  cpu_affinity:
+    - [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    - [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    - [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+  
+  # Formats de sortie
+  output_formats:
+    txt: true                # Transcription texte brut
+    srt: true                # Sous-titres horodatés
+    csv: true                # Format tabulaire
+    json: true               # Format structuré avec métadonnées
+  
+  # Paramètres de transcription
+  word_timestamps: true      # Activer l'horodatage au niveau des mots
+  confidence_threshold: 0.6  # Seuil de confiance minimal (0.0-1.0)
+
+# ========================================
+# PRÉTRAITEMENT AUDIO
+# ========================================
+preprocessing:
+  enabled: true
+  
+  # Conversion audio
+  target_format: "wav"       # Format cible (wav)
+  sample_rate: 48000         # Fréquence d'échantillonnage (Hz)
+  channels: 1                # Mono (1) ou Stéréo (2)
+  bit_depth: 16              # PCM16
+  
+  # Segmentation
+  segment_duration_min: 5    # Durée minimale d'un segment (minutes)
+  segment_duration_max: 20   # Durée maximale d'un segment (minutes)
+  
+  # Nettoyage
+  remove_silence: true       # Supprimer les silences
+  silence_threshold_db: -40  # Seuil de détection du silence (dB)
+
+# ========================================
+# SUPERVISION & QoS
+# ========================================
+qos:
+  enabled: true
+  
+  # Monitoring temps réel
+  monitoring_interval: 30    # Intervalle entre mesures CPU/RAM (secondes) - 30s pour sessions longues
+  
+  # Métriques
+  calculate_throughput: true # Calculer le débit (heures audio / heure réelle)
+  calculate_wer: true        # Calculer le Word Error Rate
+  save_detailed_metrics: true # Sauvegarder métriques détaillées
+  
+  # Génération de rapports
+  generate_graphs: true      # Générer les graphiques CPU/RAM
+  export_csv: true           # Exporter les métriques en CSV
+  export_png: true           # Exporter les graphiques en PNG
+  
+  # Seuils d'alerte
+  thresholds:
+    cpu_warning: 85          # Avertissement CPU > 85%
+    cpu_critical: 95         # Critique CPU > 95%
+    memory_warning: 80       # Avertissement RAM > 80%
+    memory_critical: 90      # Critique RAM > 90%
+  
+  # Alertes
+  alert_on_high_memory: true # Alerte si RAM > 95%
+  alert_on_cpu_throttle: true # Alerte si CPU throttling détecté
+  
+  # Monitoring énergétique
+  power:
+    enabled: true              # Activer le monitoring de consommation
+    tdp_watts: null            # TDP processeur en Watts (null = auto-détection)
+    cost_per_kwh: 0.18         # Coût électricité en €/kWh (moyenne France)
+    carbon_kg_per_kwh: 0.1     # Intensité carbone kg CO2/kWh (France 2024)
+
+# ========================================
+# EXPORT & INTÉGRATION
+# ========================================
+export:
+  # Encodage
+  encoding: "utf-8"
+  
+  # Métadonnées
+  include_metadata: true     # Inclure métadonnées (chaîne, date, heure)
+  metadata_format: "json"    # Format des métadonnées
+  
+  # Sauvegarde automatique
+  auto_backup: true
+  backup_interval_hours: 24  # Sauvegarde toutes les 24h
+  
+  # Intégration Station TV
+  stationtv_integration: true
+  stationtv_index_prefix: "TNT_" # Préfixe pour l'indexation
+
+# ========================================
+# CHEMINS & RÉPERTOIRES
+# ========================================
+paths:
+  # Répertoire de base (à adapter selon l'environnement)
+  base_dir: "C:/Users/Dorian/Desktop/stationtv"
+  
+  # Entrées
+  input_audio_dir: "C:/Users/Dorian/Documents/Perso/PRI/StationTV/app/bdd"     # Base de données audio TNT
+  
+  # Sorties
+  output_dir: "C:/Users/Dorian/Desktop/stationtv/test_output"       # Répertoire de sortie principal
+  transcriptions_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/transcriptions"
+  reports_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/reports"
+  logs_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/logs"
+  trackers_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/trackers"
+  
+  # Temporaire
+  temp_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/temp"
+  preprocessed_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/temp/preprocessed"
+  
+  # Sauvegarde
+  backup_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/backup"
+  
+  # CSV de travail
+  csv_filename: "C:/Users/Dorian/Desktop/stationtv/fichiers_audio.csv"
+
+# ========================================
+# LOGGING
+# ========================================
+logging:
+  level: "INFO"              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Fichiers de log
+  console_output: true
+  file_output: true
+  log_file: "output/logs/stationtv.log"
+  
+  # Rotation
+  max_log_size_mb: 100
+  backup_count: 5
+
+# ========================================
+# BATCH PROCESSING
+# ========================================
+batch:
+  batch_size: 2              # Nombre de fichiers par batch
+  max_file_duration_hours: 2 # Durée maximale d'un fichier (heures)
+  
+  # Gestion des erreurs
+  retry_on_error: true
+  max_retries: 3
+  retry_delay_seconds: 60
+  
+  # Priorités
+  sort_by_duration: true     # Trier par durée (algorithme glouton)

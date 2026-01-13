@@ -1,0 +1,206 @@
+@startuml StationTV_Sequence_Simple_Transcription
+!theme plain
+title Station TV - Séquence de Transcription Simple (Test Unitaire)
+
+actor Utilisateur
+participant "BasicTestWhisper.py\n(Script)" as Script
+participant "ModelManager" as ModelMgr
+participant "WhisperTranscriber" as Transcriber
+participant "Whisper API\n(OpenAI)" as Whisper
+participant "TranscriptionExporter" as Exporter
+database "Fichier Audio" as Audio
+database "Fichiers de sortie" as Output
+
+== Initialisation ==
+
+Utilisateur -> Script: python BasicTestWhisper.py --input test.mp3 --model small
+activate Script
+
+Script -> Script: Charger configuration par défaut
+note right
+  config = {
+    "whisper": {
+      "model": "small",
+      "language": "fr"
+    },
+    "output_formats": {
+      "txt": True,
+      "srt": True,
+      "json": True
+    }
+  }
+end note
+
+Script -> ModelMgr: __init__(device="cpu")
+activate ModelMgr
+ModelMgr --> Script: ModelManager initialisé
+deactivate ModelMgr
+
+Script -> Transcriber: __init__(config)
+activate Transcriber
+Transcriber -> Transcriber: Initialiser paramètres
+Transcriber --> Script: Transcriber prêt
+deactivate Transcriber
+
+== Chargement du modèle ==
+
+Script -> ModelMgr: load_model("small")
+activate ModelMgr
+
+ModelMgr -> ModelMgr: Vérifier si modèle en cache
+note right: Cache vide au premier appel
+
+ModelMgr -> Whisper: whisper.load_model("small", device="cpu")
+activate Whisper
+Whisper -> Whisper: Télécharger modèle si nécessaire (~500 MB)
+Whisper -> Whisper: Charger poids en mémoire
+Whisper --> ModelMgr: whisper_model
+deactivate Whisper
+
+ModelMgr -> ModelMgr: Mettre en cache: _loaded_models["small"] = model
+ModelMgr --> Script: whisper_model
+deactivate ModelMgr
+
+== Transcription ==
+
+Script -> Transcriber: process_and_write(audio_file, cpu_cores=[0-11], core_index=0)
+activate Transcriber
+
+Transcriber -> Audio: Vérifier existence du fichier
+activate Audio
+Audio --> Transcriber: Fichier trouvé
+deactivate Audio
+
+Transcriber -> Transcriber: transcribe_on_specific_cores(audio_path, cpu_cores)
+activate Transcriber
+
+Transcriber -> Whisper: whisper.load_audio(audio_path)
+activate Whisper
+Whisper -> Audio: Lire et prétraiter audio
+activate Audio
+Audio --> Whisper: audio_array (numpy)
+deactivate Audio
+Whisper --> Transcriber: audio_data
+deactivate Whisper
+
+note right of Transcriber
+  Mesure du temps de début
+  start_time = time.time()
+end note
+
+Transcriber -> Whisper: model.transcribe(audio_data, language="fr")
+activate Whisper
+
+Whisper -> Whisper: Encoder l'audio (Mel spectrogram)
+Whisper -> Whisper: Détecter la langue (si non spécifiée)
+Whisper -> Whisper: Décoder en texte (transformer)
+
+loop Pour chaque segment audio (30s)
+    Whisper -> Whisper: Transcription du segment
+    note right
+      Génère:
+      - Texte
+      - Timestamps (start, end)
+      - Probabilités
+    end note
+end
+
+Whisper --> Transcriber: result = {text, segments, language}
+deactivate Whisper
+
+note right of Transcriber
+  Mesure du temps de fin
+  end_time = time.time()
+  processing_time = end_time - start_time
+end note
+
+Transcriber --> Transcriber: result
+deactivate Transcriber
+
+== Création des fichiers de sortie ==
+
+alt Format TXT activé
+    Transcriber -> Transcriber: create_txt_file(result, output_file)
+    activate Transcriber
+    Transcriber -> Output: Écrire texte complet
+    note right
+      Contenu:
+      "Bonjour, ceci est une
+      transcription de test..."
+    end note
+    Transcriber --> Transcriber: success=True
+    deactivate Transcriber
+end
+
+alt Format SRT activé
+    Transcriber -> Transcriber: create_srt_file(segments, output_file)
+    activate Transcriber
+    
+    loop Pour chaque segment
+        Transcriber -> Transcriber: format_timestamp_srt(start)
+        Transcriber -> Transcriber: format_timestamp_srt(end)
+        note right
+          Format SRT:
+          1
+          00:00:00,000 --> 00:00:05,120
+          Bonjour, ceci est une transcription
+        end note
+    end
+    
+    Transcriber -> Output: Écrire fichier SRT
+    Transcriber --> Transcriber: success=True
+    deactivate Transcriber
+end
+
+alt Format JSON activé
+    Transcriber -> Exporter: export_to_json(result, output_file, metadata)
+    activate Exporter
+    
+    Exporter -> Exporter: Structurer données JSON
+    note right
+      {
+        "version": "1.0",
+        "timestamp": "2025-12-03T20:15:00",
+        "transcription": {
+          "text": "...",
+          "language": "fr",
+          "duration": 120.5
+        },
+        "segments": [...]
+      }
+    end note
+    
+    Exporter -> Output: Écrire fichier JSON
+    Exporter --> Transcriber: success=True
+    deactivate Exporter
+end
+
+Transcriber --> Script: success=True
+deactivate Transcriber
+
+== Affichage des résultats ==
+
+Script -> Script: Calculer métriques
+note right
+  - Durée audio: 120.5s
+  - Temps de traitement: 45.3s
+  - Throughput: 2.66×
+end note
+
+Script -> Utilisateur: ✅ Transcription terminée
+note right
+  Résumé:
+  - Fichier: test.mp3
+  - Modèle: small
+  - Durée: 120.5s
+  - Temps: 45.3s
+  - Throughput: 2.66×
+  - Fichiers créés:
+    * test_ws.txt
+    * test_ws.srt
+    * test_ws.json
+end note
+
+deactivate Script
+
+@enduml

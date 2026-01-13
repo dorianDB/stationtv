@@ -1,0 +1,56 @@
+COMPARAISON TRANSCRIPTIONS - Small vs Medium
+================================================================================
+
+Small  : 1053 mots
+Medium : 1032 mots
+
+WER Relatif: 14.44%
+
+Substitutions : 150
+Insertions    : 0
+Suppressions  : 5
+
+================================================================================
+EXTRAIT DES DIFFÉRENCES (premiers 500 caractères)
+================================================================================
+
+
+REPLACE:
+  Small  : ses
+  Medium : ces
+
+REPLACE:
+  Small  : verre au
+  Medium : verre. Au
+
+REPLACE:
+  Small  : retentit. Autrement dit,
+  Medium : retentit,
+
+REPLACE:
+  Small  : toky
+  Medium : talkie
+
+REPLACE:
+  Small  : que un cas s'est en cours. Il
+  Medium : qu'un casse est en cours, il
+
+REPLACE:
+  Small  : décision
+  Medium : décision,
+
+REPLACE:
+  Small  : privée
+  Medium : privée,
+
+REPLACE:
+  Small  : coeur
+  Medium : cœur
+
+REPLACE:
+  Small  : au malfaiteur.
+  Medium : aux malfaiteurs.
+
+REPLACE:
+  Small  : pyramide. Je vais traverser
+  Medium : pyramide, je traversais

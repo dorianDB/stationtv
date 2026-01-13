@@ -1,0 +1,178 @@
+@startuml StationTV_Class_Diagram
+!define CORE_COLOR #E3F2FD
+!define QOS_COLOR #FFF3E0
+!define UTILS_COLOR #E8F5E9
+!define EXPORT_COLOR #F3E5F5
+!define PREPROCESSING_COLOR #FCE4EC
+
+title Station TV - Diagramme de Classes
+
+package "core" CORE_COLOR {
+    class WhisperTranscriber {
+        - config: dict
+        - model_manager: ModelManager
+        - affinity_manager: CPUAffinityManager
+        - output_dir: Path
+        - model_name: str
+        - language: str
+        - output_formats: dict
+        + __init__(config: dict)
+        + transcribe_on_specific_cores(audio_path: str, cpu_cores: List[int], model_name: str): dict
+        + create_srt_file(segments: List[Dict], output_file: str): bool
+        + create_txt_file(result: Dict, output_file: str): bool
+        + process_and_write(audio_file: str, cpu_cores: List[int], core_index: int, tracker_path: str): bool
+        {static} + format_timestamp_srt(seconds: float): str
+    }
+
+    class ModelManager {
+        {static} - MODEL_SPECS: Dict
+        - device: str
+        - _loaded_models: Dict[str, whisper.Whisper]
+        + __init__(device: str)
+        + load_model(model_name: str, force_reload: bool): whisper.Whisper
+        + unload_model(model_name: str): bool
+        + unload_all(): void
+        + get_model_suffix(model_name: str): str
+        + estimate_ram_usage(model_name: str, num_processes: int): float
+        + validate_memory_availability(model_name: str, num_processes: int, total_ram_gb: float, max_usage_percent: float): bool
+        {static} + list_available_models(): List[str]
+    }
+
+    class CPUAffinityManager {
+        {static} + set_cpu_affinity(cpu_list: List[int]): bool
+        {static} + get_cpu_affinity(): List[int]
+        {static} + glouton_n_listes(objets: List[Audio], n: int): List[List[Audio]]
+        {static} + equilibrage_charge(objets: List[Audio], nb_processus: int): List[List[Audio]]
+    }
+
+    class Audio {
+        + path: str
+        + duree: float
+        + __init__(path: str, duree: float)
+        + __repr__(): str
+    }
+}
+
+package "qos" QOS_COLOR {
+    class SystemMonitor {
+        - output_dir: Path
+        - interval: int
+        - monitoring_active: bool
+        - cpu_thread: threading.Thread
+        - memory_thread: threading.Thread
+        - cpu_file: Path
+        - memory_file: Path
+        + __init__(output_dir: str, interval: int, auto_start: bool)
+        + monitor_cpu_usage(): void
+        + monitor_memory_usage(): void
+        + start(): void
+        + stop(timeout: int): void
+        + get_current_stats(): dict
+        + __enter__(): SystemMonitor
+        + __exit__(exc_type, exc_val, exc_tb): void
+    }
+
+    class MetricsCalculator {
+        - start_time: float
+        - end_time: float
+        - transcriptions: List[Dict]
+        + __init__()
+        + start_session(): void
+        + end_session(): void
+        + add_transcription(audio_duration: float, processing_time: float, file_path: str, model: str, success: bool): void
+        + calculate_throughput(): float
+        + calculate_average_processing_time(): float
+        + calculate_success_rate(): float
+        + get_session_duration(): float
+        + get_summary(): Dict
+        + export_to_csv(output_file: str): bool
+        + calculate_wer(reference_text: str, hypothesis_text: str): float
+    }
+
+    class QoSReporter {
+        - output_dir: Path
+        - metrics_calculator: MetricsCalculator
+        + __init__(output_dir: str)
+        + generate_plots(cpu_file: str, memory_file: str): bool
+        + generate_text_report(metrics: Dict, output_file: str): bool
+        + generate_full_report(cpu_file: str, memory_file: str, metrics: Dict): bool
+    }
+}
+
+package "utils" UTILS_COLOR {
+    class FileHandler {
+        {static} + get_audio_duration(audio_path: str): float
+        {static} + scan_audio_files(directory: str, extensions: List[str]): List[Dict]
+        {static} + validate_audio_file(file_path: str): bool
+        {static} + create_audio_objects(scan_results: List[Dict]): List[Audio]
+        {static} + save_scan_results(results: List[Dict], output_file: str): bool
+        {static} + load_scan_results(input_file: str): List[Dict]
+    }
+
+    class Logger {
+        {static} + setup_logger(name: str, log_file: str, level: str): logging.Logger
+        {static} + get_logger(name: str): logging.Logger
+    }
+}
+
+package "export" EXPORT_COLOR {
+    class TranscriptionExporter {
+        - output_dir: Path
+        + __init__(output_dir: str)
+        + export_to_json(transcription: Dict, output_file: str, metadata: Dict): bool
+        + export_to_csv(transcriptions: List[Dict], output_file: str, include_metadata: bool): bool
+        + create_backup(source_dir: str, backup_dir: str, compression: bool): bool
+    }
+}
+
+package "preprocessing" PREPROCESSING_COLOR {
+    class AudioConverter {
+        - output_dir: Path
+        - sample_rate: int
+        - channels: int
+        - format: str
+        + __init__(output_dir: str, sample_rate: int, channels: int, format: str)
+        + convert_to_wav(input_file: str, output_file: str): bool
+        + normalize_audio(input_file: str, target_level: float): bool
+        + batch_convert(input_files: List[str]): List[str]
+    }
+}
+
+' Relations
+WhisperTranscriber *-- ModelManager : utilise
+WhisperTranscriber *-- CPUAffinityManager : utilise
+CPUAffinityManager ..> Audio : manipule
+FileHandler ..> Audio : crée
+QoSReporter *-- MetricsCalculator : utilise
+WhisperTranscriber ..> Logger : utilise
+SystemMonitor ..> Logger : utilise
+MetricsCalculator ..> Logger : utilise
+TranscriptionExporter ..> Logger : utilise
+
+' Notes
+note right of WhisperTranscriber
+  Classe principale de transcription.
+  Gère le cycle complet de traitement
+  d'un fichier audio vers les formats
+  de sortie (TXT, SRT, JSON).
+end note
+
+note right of ModelManager
+  Gère le cache et le cycle de vie
+  des modèles Whisper.
+  Valide la disponibilité RAM.
+end note
+
+note right of SystemMonitor
+  Monitoring temps réel en thread.
+  Supporte le context manager.
+  Génère des CSV avec timestamps.
+end note
+
+note right of MetricsCalculator
+  Calcule les KPI (throughput, WER).
+  Suit les statistiques globales
+  de la session de transcription.
+end note
+
+@enduml
