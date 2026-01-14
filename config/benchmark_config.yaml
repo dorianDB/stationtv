@@ -1,0 +1,59 @@
+# Configuration du Benchmark des modèles Whisper
+# Station TV - Benchmark Config
+
+# Configuration Whisper de base
+whisper:
+  device: 'cpu'
+  language: 'fr'
+  word_timestamps: true
+  
+  # Formats de sortie (désactivés pour le benchmark - on mesure seulement le temps)
+  output_formats:
+    txt: false
+    srt: false
+    csv: false
+    json: false
+
+# Configuration du benchmark
+benchmark:
+  # Modèles à tester (dans l'ordre)
+  models:
+    - 'tiny'
+    - 'base'
+    - 'small'
+    - 'medium'
+    # - 'large'  # Décommenter si vous voulez tester large aussi
+  
+  # Nombre de répétitions pour chaque test (5 ou 6 comme dans votre document)
+  repetitions: 5
+  
+  # Fichiers audio à tester
+  # Vous devez les remplacer par vos vrais chemins de fichiers
+  # Idéalement, des fichiers de durées différentes: 240s (4min), 480s (8min), 720s (12min), etc.
+  audio_files:
+    - 'bdd/test_240s.mp3'   # 4 minutes
+    - 'bdd/test_480s.mp3'   # 8 minutes
+    - 'bdd/test_720s.mp3'   # 12 minutes
+    - 'bdd/test_960s.mp3'   # 16 minutes
+    - 'bdd/test_1200s.mp3'  # 20 minutes
+  
+  # Cœurs CPU à utiliser (ajuster selon votre système)
+  # Par exemple, utiliser 12 cœurs pour les tests
+  cpu_cores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  
+  # Fichier de sortie pour les résultats
+  output_file: 'output/benchmark_results.csv'
+
+# Configuration matérielle (info)
+hardware:
+  cpu_threads: 36
+  max_parallel_processes: 1  # 1 seul processus pour les benchmarks
+
+# Chemins
+paths:
+  trackers_dir: 'trackers'
+  reports_dir: 'output/reports'
+
+# QoS désactivé pour les benchmarks (pour ne pas affecter les mesures)
+qos:
+  enabled: false
