@@ -91,6 +91,16 @@ class FileHandler:
                         chemin_element.lower().endswith(ext.lower()) for ext in suffixes
                     ):
                         nouvel_objet = FichierAudio(chemin_element)
+                        
+                        # Filtrer les fichiers sans audio (durée = 0)
+                        # Cela arrive avec les fichiers vidéo qui n'ont pas de piste audio
+                        if nouvel_objet.longueur <= 0:
+                            logger.warning(
+                                f"Fichier ignoré (pas de piste audio détectable): "
+                                f"{os.path.basename(chemin_element)}"
+                            )
+                            continue
+                        
                         objets_fichiers.append(nouvel_objet)
                         logger.debug(f"Fichier trouvé: {nouvel_objet}")
                     
