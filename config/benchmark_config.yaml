@@ -22,10 +22,10 @@ benchmark:
     - 'base'
     - 'small'
     - 'medium'
-    # - 'large'  # Décommenter si vous voulez tester large aussi
+    - 'large'  # 5 modèles au total
   
-  # Nombre de répétitions pour chaque test (5 ou 6 comme dans votre document)
-  repetitions: 5
+  # Nombre de répétitions pour chaque test (10 pour RT médian robuste)
+  repetitions: 10
   
   # Fichiers audio à tester
   # Vous devez les remplacer par vos vrais chemins de fichiers

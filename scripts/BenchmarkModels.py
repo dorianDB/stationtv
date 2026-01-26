@@ -171,20 +171,25 @@ class BenchmarkRunner:
                 # Calculer les statistiques
                 if times:
                     avg_time = statistics.mean(times)
+                    median_time = statistics.median(times)
                     min_time = min(times)
                     max_time = max(times)
                     std_dev = statistics.stdev(times) if len(times) > 1 else 0
                     
-                    # Calculer le throughput
-                    throughput = audio_duration / avg_time if avg_time > 0 else 0
+                    # Calculer les RT (Real-Time factors) pour chaque run
+                    rt_factors = [audio_duration / t if t > 0 else 0 for t in times]
+                    avg_rt = statistics.mean(rt_factors)
+                    median_rt = statistics.median(rt_factors)
                     
                     logger.info("-" * 80)
                     logger.info(f"📈 Résultats pour {model_name} ({len(times)}/{repetitions} réussis):")
                     logger.info(f"   Temps moyen    : {avg_time:.2f}s")
+                    logger.info(f"   Temps médian   : {median_time:.2f}s")
                     logger.info(f"   Temps min      : {min_time:.2f}s")
                     logger.info(f"   Temps max      : {max_time:.2f}s")
                     logger.info(f"   Écart-type     : {std_dev:.2f}s")
-                    logger.info(f"   Throughput     : {throughput:.2f}× temps réel")
+                    logger.info(f"   RT moyen       : {avg_rt:.3f}× temps réel")
+                    logger.info(f"   RT médian      : {median_rt:.3f}× temps réel")
                     
                     # Enregistrer les résultats
                     self.results.append({
@@ -193,11 +198,14 @@ class BenchmarkRunner:
                         'model': model_name,
                         'repetitions': len(times),
                         'avg_time': avg_time,
+                        'median_time': median_time,
                         'min_time': min_time,
                         'max_time': max_time,
                         'std_dev': std_dev,
-                        'throughput': throughput,
-                        'all_times': times
+                        'avg_rt': avg_rt,
+                        'median_rt': median_rt,
+                        'all_times': times,
+                        'all_rt_factors': rt_factors
                     })
                 else:
                     logger.warning(f"⚠️ Aucun test réussi pour {model_name}")
@@ -227,8 +235,12 @@ class BenchmarkRunner:
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = [
                 'file', 'duration_s', 'duration_min', 'model', 'repetitions',
-                'avg_time_s', 'min_time_s', 'max_time_s', 'std_dev_s',
-                'throughput', 'run_1', 'run_2', 'run_3', 'run_4', 'run_5', 'run_6'
+                'avg_time_s', 'median_time_s', 'min_time_s', 'max_time_s', 'std_dev_s',
+                'avg_rt', 'median_rt',
+                'run_1', 'run_2', 'run_3', 'run_4', 'run_5',
+                'run_6', 'run_7', 'run_8', 'run_9', 'run_10',
+                'rt_1', 'rt_2', 'rt_3', 'rt_4', 'rt_5',
+                'rt_6', 'rt_7', 'rt_8', 'rt_9', 'rt_10'
             ]
             
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -242,16 +254,23 @@ class BenchmarkRunner:
                     'model': result['model'],
                     'repetitions': result['repetitions'],
                     'avg_time_s': f"{result['avg_time']:.2f}",
+                    'median_time_s': f"{result['median_time']:.2f}",
                     'min_time_s': f"{result['min_time']:.2f}",
                     'max_time_s': f"{result['max_time']:.2f}",
                     'std_dev_s': f"{result['std_dev']:.2f}",
-                    'throughput': f"{result['throughput']:.2f}"
+                    'avg_rt': f"{result['avg_rt']:.3f}",
+                    'median_rt': f"{result['median_rt']:.3f}"
                 }
                 
-                # Ajouter les temps individuels
+                # Ajouter les temps individuels (jusqu'à 10 runs)
                 for i, t in enumerate(result['all_times'], 1):
-                    if i <= 6:  # Max 6 runs
+                    if i <= 10:
                         row[f'run_{i}'] = f"{t:.2f}"
+                
+                # Ajouter les RT individuels (jusqu'à 10 runs)
+                for i, rt in enumerate(result['all_rt_factors'], 1):
+                    if i <= 10:
+                        row[f'rt_{i}'] = f"{rt:.3f}"
                 
                 writer.writerow(row)
         
@@ -264,6 +283,7 @@ class BenchmarkRunner:
     def _export_summary_matrix(self, output_file: str):
         """
         Exporte un résumé sous forme de matrice (comme dans votre image).
+        Crée deux matrices: une pour les temps médians, une pour les RT médians.
         
         Args:
             output_file: Chemin du fichier de sortie
@@ -271,24 +291,32 @@ class BenchmarkRunner:
         logger.info(f"📊 Export du résumé matriciel vers {output_file}")
         
         # Organiser les résultats par durée et modèle
-        matrix = {}
+        median_time_matrix = {}
+        median_rt_matrix = {}
         
         for result in self.results:
             duration = result['duration_s']
             model = result['model']
-            avg_time = result['avg_time']
+            median_time = result['median_time']
+            median_rt = result['median_rt']
             
-            if duration not in matrix:
-                matrix[duration] = {}
+            if duration not in median_time_matrix:
+                median_time_matrix[duration] = {}
+                median_rt_matrix[duration] = {}
             
-            matrix[duration][model] = avg_time
+            median_time_matrix[duration][model] = median_time
+            median_rt_matrix[duration][model] = median_rt
         
-        # Écrire la matrice
+        # Écrire les matrices
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             models = sorted(set(r['model'] for r in self.results))
-            durations = sorted(matrix.keys())
+            durations = sorted(median_time_matrix.keys())
             
             writer = csv.writer(csvfile)
+            
+            # === MATRICE 1: Temps de traitement médian (secondes) ===
+            writer.writerow(['### TEMPS DE TRAITEMENT MÉDIAN (secondes) ###'])
+            writer.writerow([])
             
             # En-tête
             writer.writerow(['Duration (s)'] + models)
@@ -297,30 +325,51 @@ class BenchmarkRunner:
             for duration in durations:
                 row = [f"{duration:.0f}"]
                 for model in models:
-                    time_val = matrix.get(duration, {}).get(model, 0)
+                    time_val = median_time_matrix.get(duration, {}).get(model, 0)
                     row.append(f"{time_val:.2f}" if time_val > 0 else "")
                 writer.writerow(row)
             
-            # Ajouter les métriques de throughput
             writer.writerow([])
-            writer.writerow(['Metrics'])
+            writer.writerow([])
             
-            # Calculer Th (throughput)
-            th_row = ['Th (avg)']
-            inverse_th_row = ['1/Th (avg)']
+            # === MATRICE 2: RT (Real-Time factor) médian ===
+            writer.writerow(['### RT MÉDIAN (Real-Time factor) ###'])
+            writer.writerow([])
+            
+            # En-tête
+            writer.writerow(['Duration (s)'] + models)
+            
+            # Lignes de données
+            for duration in durations:
+                row = [f"{duration:.0f}"]
+                for model in models:
+                    rt_val = median_rt_matrix.get(duration, {}).get(model, 0)
+                    row.append(f"{rt_val:.3f}" if rt_val > 0 else "")
+                writer.writerow(row)
+            
+            writer.writerow([])
+            writer.writerow([])
+            
+            # === MÉTRIQUES GLOBALES ===
+            writer.writerow(['### MÉTRIQUES GLOBALES ###'])
+            writer.writerow([])
+            
+            # Calculer RT médian moyen par modèle
+            rt_median_avg_row = ['RT médian moyen']
+            rt_inverse_row = ['1/RT médian moyen']
             
             for model in models:
                 model_results = [r for r in self.results if r['model'] == model]
                 if model_results:
-                    avg_throughput = statistics.mean([r['throughput'] for r in model_results])
-                    th_row.append(f"{avg_throughput:.3f}")
-                    inverse_th_row.append(f"{1/avg_throughput:.3f}" if avg_throughput > 0 else "")
+                    avg_median_rt = statistics.mean([r['median_rt'] for r in model_results])
+                    rt_median_avg_row.append(f"{avg_median_rt:.3f}")
+                    rt_inverse_row.append(f"{1/avg_median_rt:.3f}" if avg_median_rt > 0 else "")
                 else:
-                    th_row.append("")
-                    inverse_th_row.append("")
+                    rt_median_avg_row.append("")
+                    rt_inverse_row.append("")
             
-            writer.writerow(th_row)
-            writer.writerow(inverse_th_row)
+            writer.writerow(rt_median_avg_row)
+            writer.writerow(rt_inverse_row)
         
         logger.info(f"✓ Résumé matriciel exporté avec succès")
 
