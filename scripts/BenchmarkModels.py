@@ -131,10 +131,11 @@ class BenchmarkRunner:
             
             # Obtenir la durée du fichier
             try:
-                from utils.file_handler import FileHandler
-                audio_info = FileHandler.obtenir_duree_audio(str(audio_path))
-                audio_duration = audio_info if isinstance(audio_info, (int, float)) else 0
-            except:
+                from utils.file_handler import FichierAudio
+                fichier_audio = FichierAudio(str(audio_path))
+                audio_duration = fichier_audio.longueur
+            except Exception as e:
+                logger.warning(f"Impossible d'obtenir la durée du fichier: {str(e)}")
                 audio_duration = 0
             
             logger.info("")

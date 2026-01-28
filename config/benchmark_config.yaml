@@ -10,8 +10,8 @@ whisper:
   # Formats de sortie (désactivés pour le benchmark - on mesure seulement le temps)
   output_formats:
     txt: false
-    srt: false
-    csv: false
+    srt: true
+    csv: true
     json: false
 
 # Configuration du benchmark
@@ -31,11 +31,11 @@ benchmark:
   # Vous devez les remplacer par vos vrais chemins de fichiers
   # Idéalement, des fichiers de durées différentes: 240s (4min), 480s (8min), 720s (12min), etc.
   audio_files:
-    - 'bdd/test_240s.mp3'   # 4 minutes
-    - 'bdd/test_480s.mp3'   # 8 minutes
-    - 'bdd/test_720s.mp3'   # 12 minutes
-    - 'bdd/test_960s.mp3'   # 16 minutes
-    - 'bdd/test_1200s.mp3'  # 20 minutes
+    - 'data/audio4.mp3'   # 4 minutes
+    - 'data/audio8.mp3'   # 8 minutes
+    - 'data/audio12.mp3'   # 12 minutes
+    - 'data/audio16.mp3'   # 16 minutes
+    - 'data/audio20.mp3'  # 20 minutes
   
   # Cœurs CPU à utiliser (ajuster selon votre système)
   # Par exemple, utiliser 12 cœurs pour les tests
