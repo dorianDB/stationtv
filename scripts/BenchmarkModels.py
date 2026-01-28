@@ -73,16 +73,18 @@ class BenchmarkRunner:
         try:
             start_time = time.time()
             
-            # Transcription
-            result = transcriber.transcribe_on_specific_cores(
+            # Transcription avec sauvegarde des fichiers
+            # Utilise process_and_write pour sauvegarder avec le numéro de run
+            success = transcriber.process_and_write(
                 audio_file,
                 cpu_cores,
-                model_name=model_name
+                core_index=0,
+                run_number=run_number
             )
             
             processing_time = time.time() - start_time
             
-            if result is None:
+            if not success:
                 logger.error(f"    ❌ Échec de la transcription")
                 return 0.0, False
             

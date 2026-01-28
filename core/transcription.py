@@ -187,7 +187,8 @@ class WhisperTranscriber:
         audio_file: str, 
         cpu_cores: List[int],
         core_index: int,
-        tracker_path: Optional[str] = None
+        tracker_path: Optional[str] = None,
+        run_number: Optional[int] = None
     ) -> bool:
         """
         Lance la transcription et écrit les résultats dans les fichiers de sortie.
@@ -198,6 +199,7 @@ class WhisperTranscriber:
             cpu_cores: Liste des cœurs CPU à utiliser
             core_index: Index du processus (pour tracking)
             tracker_path: Chemin du fichier tracker (optionnel)
+            run_number: Numéro du run (optionnel, pour benchmark avec répétitions)
         
         Returns:
             True si succès, False sinon
@@ -227,23 +229,26 @@ class WhisperTranscriber:
             timestamp = match.group(1)
         else:
             # Générer timestamp actuel (heure de transcription)
-            timestamp = datetime.now().strftime("%Y%m%d_%H_%M")
+            timestamp = datetime.now().strftime("%Y%m%d_%H_%M_%S")
         
         # Suffixe du modèle (format STVD-MNER: wt, wb, ws, wm)
         model_suffix = self.model_manager.get_model_suffix(self.model_name)
         
+        # Ajouter le numéro de run si fourni (pour benchmarks)
+        run_suffix = f"_run{run_number}" if run_number is not None else ""
+        
         # Générer les fichiers de sortie selon la convention STVD-MNER
-        # Format: {timestamp}_transcript_{model_suffix}.{ext}
+        # Format: {timestamp}_transcript_{model_suffix}{run_suffix}.{ext}
         success = True
         
         if self.transcription_srt and "segments" in result and result["segments"]:
-            # SRT avec sous-titres: _transcript_st_{model_suffix}
-            output_srt = os.path.join(audio_dir, f"{timestamp}_transcript_st_{model_suffix}.srt")
+            # SRT avec sous-titres: _transcript_st_{model_suffix}{run_suffix}
+            output_srt = os.path.join(audio_dir, f"{timestamp}_transcript_st_{model_suffix}{run_suffix}.srt")
             success &= self.create_srt_file(result["segments"], output_srt)
         
         if self.transcription_txt and "text" in result and result["text"].strip():
-            # TXT simple: _transcript_{model_suffix}
-            output_txt = os.path.join(audio_dir, f"{timestamp}_transcript_{model_suffix}.txt")
+            # TXT simple: _transcript_{model_suffix}{run_suffix}
+            output_txt = os.path.join(audio_dir, f"{timestamp}_transcript_{model_suffix}{run_suffix}.txt")
             success &= self.create_txt_file(result, output_txt)
         
         # Temps d'exécution
