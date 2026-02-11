@@ -27,6 +27,9 @@ benchmark:
   # Nombre de répétitions pour chaque test (10 pour RT médian robuste)
   repetitions: 10
   
+  # Nombre de threads PyTorch (k=1 pour optimiser le débit global Th)
+  num_threads: 1
+  
   # Fichiers audio à tester
   # Vous devez les remplacer par vos vrais chemins de fichiers
   # Idéalement, des fichiers de durées différentes: 240s (4min), 480s (8min), 720s (12min), etc.

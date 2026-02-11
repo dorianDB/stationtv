@@ -41,6 +41,8 @@ class BenchmarkRunner:
         """
         self.config = config
         self.results = []
+        # Récupérer num_threads depuis la config (par défaut: None = auto)
+        self.num_threads = config.get('benchmark', {}).get('num_threads', None)
         
     def run_single_test(
         self,
@@ -64,6 +66,10 @@ class BenchmarkRunner:
         # Créer une configuration temporaire pour ce modèle
         temp_config = self.config.copy()
         temp_config['whisper']['model'] = model_name
+        
+        # Si num_threads est défini, l'ajouter à la config
+        if self.num_threads is not None:
+            temp_config['num_threads'] = self.num_threads
         
         # Créer le transcripteur
         transcriber = WhisperTranscriber(temp_config)

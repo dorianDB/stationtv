@@ -80,8 +80,11 @@ class WhisperTranscriber:
             return None
         
         # Configurer PyTorch
-        torch.set_num_threads(len(cpu_cores))
-        logger.info(f"Threads PyTorch: {torch.get_num_threads()}")
+        # Utiliser num_threads de la config si spécifié (pour benchmarks k=1)
+        # Sinon, utiliser le nombre de cores
+        num_threads = self.config.get('num_threads', len(cpu_cores))
+        torch.set_num_threads(num_threads)
+        logger.info(f"Threads PyTorch: {torch.get_num_threads()} (cores alloués: {len(cpu_cores)})")
         
         try:
             # Effectuer la transcription
