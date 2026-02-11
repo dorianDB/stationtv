@@ -23,6 +23,7 @@ from core.affinity import CPUAffinityManager, Audio
 from qos.monitor import SystemMonitor
 from qos.metrics import MetricsCalculator
 from qos.power_monitor import PowerMonitor
+from qos.reporter import QoSReporter
 from utils.logger import setup_logger
 from utils.file_handler import FileHandler
 
@@ -343,6 +344,55 @@ def main():
         logger.info(f"Audio traité: {summary['total_audio_duration_hours']:.2f}h")
         logger.info(f"Throughput: {summary['throughput']:.2f}× temps réel")
         logger.info("-" * 80)
+        
+        # Générer les graphiques et rapports (si activé dans la config)
+        if qos_enabled and config.get('qos', {}).get('generate_graphs', True):
+            logger.info("\n" + "=" * 80)
+            logger.info("GÉNÉRATION DES RAPPORTS ET GRAPHIQUES")
+            logger.info("=" * 80)
+            
+            output_dir = config.get('paths', {}).get('reports_dir', 'output/reports')
+            reporter = QoSReporter(output_dir=output_dir)
+            
+            # Graphique CPU
+            cpu_file = Path(output_dir) / "monitoring_cpu.csv"
+            if cpu_file.exists():
+                logger.info("\nGénération du graphique CPU...")
+                if reporter.plot_cpu_usage(str(cpu_file)):
+                    logger.info("✓ Graphique CPU généré")
+                else:
+                    logger.warning("⚠ Échec génération graphique CPU")
+            
+            # Graphique RAM
+            memory_file = Path(output_dir) / "monitoring_memory.csv"
+            if memory_file.exists():
+                logger.info("\nGénération du graphique RAM...")
+                if reporter.plot_memory_usage(str(memory_file)):
+                    logger.info("✓ Graphique RAM généré")
+                else:
+                    logger.warning("⚠ Échec génération graphique RAM")
+            
+            # Graphique de consommation énergétique
+            power_file = Path(output_dir) / "monitoring_power.csv"
+            if power_file.exists() and config.get('qos', {}).get('power', {}).get('enabled', True):
+                logger.info("\nGénération du graphique de consommation énergétique...")
+                power_graph = reporter.plot_power_usage(str(power_file))
+                if power_graph:
+                    logger.info("✓ Graphique énergétique généré")
+                else:
+                    logger.warning("⚠ Échec génération graphique énergétique")
+            
+            # Rapport de synthèse
+            if config.get('qos', {}).get('export_csv', True):
+                logger.info("\nGénération du rapport de synthèse...")
+                if reporter.generate_summary_report(summary):
+                    logger.info("✓ Rapport de synthèse généré")
+                else:
+                    logger.warning("⚠ Échec génération rapport")
+            
+            logger.info("\n" + "=" * 80)
+            logger.info(f"📊 Tous les rapports sont disponibles dans: {output_dir}")
+            logger.info("=" * 80)
         
     except KeyboardInterrupt:
         logger.warning("\n⚠️ Interruption par l'utilisateur")
