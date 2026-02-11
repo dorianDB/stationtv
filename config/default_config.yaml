@@ -6,9 +6,9 @@
 # ========================================
 hardware:
   cpu_cores: 24              # Nombre de cœurs physiques
-  cpu_threads: 32            # Nombre de threads disponibles
-  max_parallel_processes: 3  # Nombre max de processus Whisper simultanés
-  ram_total_gb: 32          # RAM totale installée
+  cpu_threads: 36            # Nombre de threads disponibles (total machine: Xeon W-2295)
+  max_parallel_processes: 24 # Nombre max de processus Whisper simultanés (24 fichiers batch)
+  ram_total_gb: 256          # RAM totale installée (Dell Precision 5820)
   ram_max_usage_percent: 90  # Utilisation RAM maximale autorisée (%)
 
 # ========================================
@@ -20,11 +20,32 @@ whisper:
   device: "cpu"              # cpu ou cuda (GPU désactivé pour stabilité)
   
   # Répartition des cœurs par processus
-  # Format: liste de listes [[core1, core2], [core3, core4], ...]
+  # Format: liste de listes [[core1, core2], [core3], ...]
   cpu_affinity:
-    - [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    - [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
-    - [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+    - [0, 1]    # Processus 1 (2 threads)
+    - [2, 3]    # Processus 2 (2 threads)
+    - [4, 5]    # Processus 3 (2 threads)
+    - [6, 7]    # Processus 4 (2 threads)
+    - [8, 9]    # Processus 5 (2 threads)
+    - [10, 11]  # Processus 6 (2 threads)
+    - [12]      # Processus 7 (1 thread)
+    - [13]      # Processus 8 (1 thread)
+    - [14]      # Processus 9 (1 thread)
+    - [15]      # Processus 10 (1 thread)
+    - [16]      # Processus 11 (1 thread)
+    - [17]      # Processus 12 (1 thread)
+    - [18]      # Processus 13 (1 thread)
+    - [19]      # Processus 14 (1 thread)
+    - [20]      # Processus 15 (1 thread)
+    - [21]      # Processus 16 (1 thread)
+    - [22]      # Processus 17 (1 thread)
+    - [23]      # Processus 18 (1 thread)
+    - [24]      # Processus 19 (1 thread)
+    - [25]      # Processus 20 (1 thread)
+    - [26]      # Processus 21 (1 thread)
+    - [27]      # Processus 22 (1 thread)
+    - [28]      # Processus 23 (1 thread)
+    - [29]      # Processus 24 (1 thread)
   
   # Formats de sortie
   output_formats:
@@ -63,23 +84,26 @@ preprocessing:
 qos:
   enabled: true
   
-  # Monitoring temps réel
-  monitoring_interval: 30    # Intervalle entre mesures CPU/RAM (secondes) - 30s pour sessions longues
+  # Monitoring temps réel - TESTS BATCH OPTIMISÉS
+  monitoring_interval: 10    # Intervalle entre mesures CPU/RAM (secondes) - 10s pour précision accrue
   
-  # Métriques
-  calculate_throughput: true # Calculer le débit (heures audio / heure réelle)
-  calculate_wer: true        # Calculer le Word Error Rate
-  save_detailed_metrics: true # Sauvegarder métriques détaillées
+  # Métriques de performance (Tests batch: 24 fichiers × 1h × k=30 = 720h)
+  calculate_throughput: true     # Calculer le débit (heures audio / heure réelle)
+  calculate_wer: true            # Calculer le Word Error Rate
+  save_detailed_metrics: true    # Sauvegarder métriques détaillées
+  track_response_time: true      # Temps de réponse par fichier
+  track_cpu_per_process: true    # Charge CPU par processus Whisper
+  track_memory_per_process: true # Charge RAM par processus Whisper
   
   # Génération de rapports
   generate_graphs: true      # Générer les graphiques CPU/RAM
   export_csv: true           # Exporter les métriques en CSV
   export_png: true           # Exporter les graphiques en PNG
   
-  # Seuils d'alerte
+  # Seuils d'alerte (optimisés pour ~90% CPU cible)
   thresholds:
-    cpu_warning: 85          # Avertissement CPU > 85%
-    cpu_critical: 95         # Critique CPU > 95%
+    cpu_warning: 92          # Avertissement CPU > 92% (légèrement au-dessus de la cible)
+    cpu_critical: 98         # Critique CPU > 98% (proche saturation)
     memory_warning: 80       # Avertissement RAM > 80%
     memory_critical: 90      # Critique RAM > 90%
   
@@ -160,8 +184,8 @@ logging:
 # BATCH PROCESSING
 # ========================================
 batch:
-  batch_size: 2              # Nombre de fichiers par batch
-  max_file_duration_hours: 2 # Durée maximale d'un fichier (heures)
+  batch_size: 24             # Nombre de fichiers par batch (24 fichiers × 1h pour tests)
+  max_file_duration_hours: 1 # Durée maximale d'un fichier (heures) - fichiers de 1h
   
   # Gestion des erreurs
   retry_on_error: true
