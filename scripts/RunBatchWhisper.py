@@ -187,8 +187,16 @@ def lancer_traitement_batch(config: dict, metrics_calculator: MetricsCalculator)
             return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', s)]
         
         dossiers_tries = sorted(noms_dossiers, key=natural_sort_key)
-        nb_processus = len(dossiers_tries)  # Ajuster au nombre réel de dossiers
-        logger.info(f"Mode 'Coeurs' détecté : {nb_processus} dossiers -> {nb_processus} processus")
+        
+        # Limiter au nombre de processus configuré
+        if len(dossiers_tries) > nb_processus:
+            logger.warning(
+                f"{len(dossiers_tries)} dossiers Coeur trouvés mais max_parallel_processes={nb_processus}. "
+                f"Seuls Coeur1 à Coeur{nb_processus} seront traités."
+            )
+            dossiers_tries = dossiers_tries[:nb_processus]
+        
+        logger.info(f"Mode 'Coeurs' détecté : {len(dossiers_tries)} dossiers -> {len(dossiers_tries)} processus")
         
         listes_audio = []
         for i, nom_dossier in enumerate(dossiers_tries):
