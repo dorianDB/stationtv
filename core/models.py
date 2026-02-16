@@ -1,10 +1,10 @@
 """
 Station TV - Model Manager
 Gestion des modèles Whisper (chargement, cache, validation)
+Utilise faster-whisper (CTranslate2) pour des performances optimales.
 """
 
-import whisper
-import torch
+from faster_whisper import WhisperModel
 from typing import Optional, Dict
 from utils.logger import get_logger
 
@@ -14,41 +14,45 @@ logger = get_logger(__name__)
 class ModelManager:
     """
     Gestionnaire centralisé des modèles Whisper.
+    Utilise faster-whisper (CTranslate2) au lieu de openai-whisper (PyTorch)
+    pour réduire la consommation RAM et améliorer le throughput.
     """
     
-    # Spécifications des modèles (RAM estimée en Go)
+    # Spécifications des modèles (RAM estimée en Go avec CTranslate2 int8)
     MODEL_SPECS = {
-        "tiny": {"ram_gb": 1, "suffix": "wt"},
-        "base": {"ram_gb": 1, "suffix": "wb"},
-        "small": {"ram_gb": 2, "suffix": "ws"},
-        "medium": {"ram_gb": 5, "suffix": "wm"},
-        "large": {"ram_gb": 10, "suffix": "wl"},
-        "large-v2": {"ram_gb": 10, "suffix": "wl2"},
-        "large-v3": {"ram_gb": 10, "suffix": "wl3"},
+        "tiny": {"ram_gb": 0.5, "suffix": "wt"},
+        "base": {"ram_gb": 0.5, "suffix": "wb"},
+        "small": {"ram_gb": 1, "suffix": "ws"},
+        "medium": {"ram_gb": 3, "suffix": "wm"},
+        "large": {"ram_gb": 5, "suffix": "wl"},
+        "large-v2": {"ram_gb": 5, "suffix": "wl2"},
+        "large-v3": {"ram_gb": 5, "suffix": "wl3"},
     }
     
-    def __init__(self, device: str = "cpu"):
+    def __init__(self, device: str = "cpu", compute_type: str = "int8"):
         """
         Initialise le gestionnaire de modèles.
         
         Args:
             device: Device à utiliser ('cpu' ou 'cuda')
+            compute_type: Type de calcul CTranslate2 ('int8', 'float16', 'float32')
         """
         self.device = device
-        self._loaded_models: Dict[str, whisper.Whisper] = {}
+        self.compute_type = compute_type
+        self._loaded_models: Dict[str, WhisperModel] = {}
         
-        logger.info(f"ModelManager initialisé avec device={device}")
+        logger.info(f"ModelManager initialisé avec device={device}, compute_type={compute_type}")
     
-    def load_model(self, model_name: str, force_reload: bool = False) -> Optional[whisper.Whisper]:
+    def load_model(self, model_name: str, force_reload: bool = False) -> Optional[WhisperModel]:
         """
-        Charge un modèle Whisper en mémoire.
+        Charge un modèle Whisper en mémoire via faster-whisper.
         
         Args:
             model_name: Nom du modèle (tiny, base, small, medium, large)
             force_reload: Forcer le rechargement même si déjà en cache
         
         Returns:
-            Modèle Whisper chargé ou None en cas d'erreur
+            Modèle WhisperModel chargé ou None en cas d'erreur
         """
         # Vérifier si le modèle est déjà chargé
         if model_name in self._loaded_models and not force_reload:
@@ -61,13 +65,20 @@ class ModelManager:
             return None
         
         try:
-            logger.info(f"Chargement du modèle {model_name} sur {self.device}...")
-            model = whisper.load_model(model_name, device=self.device)
+            logger.info(f"Chargement du modèle {model_name} sur {self.device} (compute_type={self.compute_type})...")
+            
+            # faster-whisper: cpu_threads=0 = auto-détection
+            model = WhisperModel(
+                model_name,
+                device=self.device,
+                compute_type=self.compute_type,
+                cpu_threads=0
+            )
             
             # Mettre en cache
             self._loaded_models[model_name] = model
             
-            logger.info(f"Modèle {model_name} chargé avec succès")
+            logger.info(f"Modèle {model_name} chargé avec succès (faster-whisper/CTranslate2)")
             return model
             
         except Exception as e:
@@ -86,7 +97,6 @@ class ModelManager:
         """
         if model_name in self._loaded_models:
             del self._loaded_models[model_name]
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
             logger.info(f"Modèle {model_name} déchargé")
             return True
         else:
@@ -124,12 +134,12 @@ class ModelManager:
             RAM estimée en Go
         """
         base_ram = self.MODEL_SPECS.get(model_name, {}).get("ram_gb", 0)
-        # Ajouter une marge de sécurité de 50%
+        # Marge de sécurité de 50% (plus faible qu'avec PyTorch)
         estimated_ram = base_ram * num_processes * 1.5
         
         logger.info(
             f"RAM estimée pour {num_processes} processus {model_name}: "
-            f"{estimated_ram:.1f} Go"
+            f"{estimated_ram:.1f} Go (faster-whisper/CTranslate2)"
         )
         
         return estimated_ram

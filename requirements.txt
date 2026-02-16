@@ -1,10 +1,8 @@
 # Station TV - Transcription Audio Haute Performance
 # Requirements Python 3.10+
 
-# Core AI/ML
-openai-whisper
-torch
-torchaudio
+# Core AI/ML (faster-whisper utilise CTranslate2 au lieu de PyTorch)
+faster-whisper
 
 # Audio processing
 ffmpeg-python

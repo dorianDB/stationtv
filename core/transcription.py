@@ -1,12 +1,11 @@
 """
 Station TV - Whisper Transcriber
-Module principal de transcription audio basé sur Whisper.
+Module principal de transcription audio basé sur faster-whisper (CTranslate2).
 Adapté et amélioré depuis WhisperTranscriptor.py
 """
 
 import time
 import os
-import torch
 import warnings
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -19,13 +18,13 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Supprimer les avertissements FP16
+# Supprimer les avertissements
 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
 
 
 class WhisperTranscriber:
     """
-    Classe principale de transcription audio avec Whisper.
+    Classe principale de transcription audio avec faster-whisper.
     """
     
     def __init__(self, config: dict):
@@ -36,7 +35,12 @@ class WhisperTranscriber:
             config: Dictionnaire de configuration
         """
         self.config = config
-        self.model_manager = ModelManager(device=config.get('whisper', {}).get('device', 'cpu'))
+        
+        # Récupérer le compute_type depuis la config (défaut: int8 pour CPU)
+        device = config.get('whisper', {}).get('device', 'cpu')
+        compute_type = config.get('whisper', {}).get('compute_type', 'int8')
+        
+        self.model_manager = ModelManager(device=device, compute_type=compute_type)
         self.model_name = config.get('whisper', {}).get('model', 'small')
         self.language = config.get('whisper', {}).get('language', 'fr')
         
@@ -47,7 +51,7 @@ class WhisperTranscriber:
         self.transcription_csv = output_formats.get('csv', False)
         self.transcription_json = output_formats.get('json', False)
         
-        logger.info(f"WhisperTranscriber initialisé avec modèle={self.model_name}, langue={self.language}")
+        logger.info(f"WhisperTranscriber initialisé avec modèle={self.model_name}, langue={self.language}, compute_type={compute_type}")
     
     def transcribe_on_specific_cores(
         self, 
@@ -57,7 +61,6 @@ class WhisperTranscriber:
     ) -> Optional[Dict]:
         """
         Effectue la transcription sur les cœurs CPU spécifiés.
-        Réutilisé depuis WhisperTranscriptor.py avec améliorations.
         
         Args:
             audio_path: Chemin du fichier audio
@@ -65,7 +68,7 @@ class WhisperTranscriber:
             model_name: Nom du modèle (optionnel, utilise config par défaut)
         
         Returns:
-            Résultat de la transcription ou None en cas d'erreur
+            Résultat de la transcription (dict compatible openai-whisper) ou None
         """
         # Définir l'affinité CPU
         CPUAffinityManager.set_cpu_affinity(cpu_cores)
@@ -79,28 +82,62 @@ class WhisperTranscriber:
             logger.error(f"Impossible de charger le modèle {model_name}")
             return None
         
-        # Configurer PyTorch
-        # Utiliser num_threads de la config si spécifié (pour benchmarks k=1)
-        # Sinon, utiliser le nombre de cores
+        # Log du nombre de cores alloués
         num_threads = self.config.get('num_threads', len(cpu_cores))
-        torch.set_num_threads(num_threads)
-        logger.info(f"Threads PyTorch: {torch.get_num_threads()} (cores alloués: {len(cpu_cores)})")
+        logger.info(f"Cores alloués: {len(cpu_cores)}, num_threads config: {num_threads}")
         
         try:
-            # Effectuer la transcription
+            # Effectuer la transcription avec faster-whisper
             word_timestamps = self.config.get('whisper', {}).get('word_timestamps', True)
             
-            logger.info(f"Transcription de {audio_path} avec {model_name}...")
+            logger.info(f"Transcription de {audio_path} avec {model_name} (faster-whisper)...")
             start_time = time.time()
             
-            result = model.transcribe(
+            # faster-whisper API: retourne (segments_generator, info)
+            segments_generator, info = model.transcribe(
                 audio_path,
                 language=self.language,
-                word_timestamps=word_timestamps if self.transcription_srt else False
+                word_timestamps=word_timestamps if self.transcription_srt else False,
+                beam_size=5
             )
+            
+            # Convertir le générateur en liste de dicts (format compatible openai-whisper)
+            segments = []
+            full_text_parts = []
+            
+            for segment in segments_generator:
+                seg_dict = {
+                    "id": segment.id,
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text,
+                }
+                
+                # Ajouter les mots si word_timestamps activé
+                if word_timestamps and self.transcription_srt and segment.words:
+                    seg_dict["words"] = [
+                        {
+                            "word": word.word,
+                            "start": word.start,
+                            "end": word.end,
+                            "probability": word.probability
+                        }
+                        for word in segment.words
+                    ]
+                
+                segments.append(seg_dict)
+                full_text_parts.append(segment.text)
             
             elapsed_time = time.time() - start_time
             logger.info(f"Transcription terminée en {elapsed_time:.2f}s")
+            
+            # Construire le résultat au format compatible openai-whisper
+            result = {
+                "text": " ".join(full_text_parts),
+                "segments": segments,
+                "language": info.language,
+                "duration": info.duration,
+            }
             
             return result
             
