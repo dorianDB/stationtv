@@ -168,8 +168,38 @@ def lancer_traitement_batch(config: dict, metrics_calculator: MetricsCalculator)
     nb_processus = config.get('hardware', {}).get('max_parallel_processes', 3)
     logger.info(f"Nombre de processus parallèles: {nb_processus}")
     
-    # Répartition avec algorithme glouton
-    listes_audio = CPUAffinityManager.equilibrage_charge(liste_audios, nb_processus)
+    # Regrouper les fichiers par dossier parent (Coeur1, Coeur2, ...)
+    import re
+    fichiers_par_dossier = {}
+    for audio in liste_audios:
+        dossier_parent = Path(audio.path).parent.name
+        if dossier_parent not in fichiers_par_dossier:
+            fichiers_par_dossier[dossier_parent] = []
+        fichiers_par_dossier[dossier_parent].append(audio)
+    
+    # Détecter le mode "dossiers Coeur"
+    noms_dossiers = list(fichiers_par_dossier.keys())
+    mode_coeur = any("coeur" in d.lower() for d in noms_dossiers) and len(noms_dossiers) > 1
+    
+    if mode_coeur:
+        # Tri naturel (Coeur1, Coeur2, ..., Coeur10, ..., Coeur30)
+        def natural_sort_key(s):
+            return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', s)]
+        
+        dossiers_tries = sorted(noms_dossiers, key=natural_sort_key)
+        nb_processus = len(dossiers_tries)  # Ajuster au nombre réel de dossiers
+        logger.info(f"Mode 'Coeurs' détecté : {nb_processus} dossiers -> {nb_processus} processus")
+        
+        listes_audio = []
+        for i, nom_dossier in enumerate(dossiers_tries):
+            fichiers = fichiers_par_dossier[nom_dossier]
+            duree_totale = sum(a.duree for a in fichiers) / 3600
+            logger.info(f"  Processus {i+1} -> {nom_dossier} ({len(fichiers)} fichiers, {duree_totale:.1f}h)")
+            listes_audio.append(fichiers)
+    else:
+        # Répartition classique avec algorithme glouton
+        logger.info("Mode classique : équilibrage de charge par durée")
+        listes_audio = CPUAffinityManager.equilibrage_charge(liste_audios, nb_processus)
     
     # Configuration des cœurs CPU
     cpu_affinity = config.get('whisper', {}).get('cpu_affinity', [])

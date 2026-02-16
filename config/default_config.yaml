@@ -7,7 +7,7 @@
 hardware:
   cpu_cores: 24              # Nombre de cœurs physiques
   cpu_threads: 36            # Nombre de threads disponibles (total machine: Xeon W-2295)
-  max_parallel_processes: 3  # Nombre max de processus Whisper simultanés (3 processus × 10 threads)
+  max_parallel_processes: 30 # Nombre max de processus Whisper simultanés (1 par dossier Coeur)
   ram_total_gb: 256          # RAM totale installée (Dell Precision 5820)
   ram_max_usage_percent: 90  # Utilisation RAM maximale autorisée (%)
 
@@ -19,12 +19,39 @@ whisper:
   language: "fr"             # Langue principale (français)
   device: "cpu"              # cpu ou cuda (GPU désactivé pour stabilité)
   
-  # Répartition des cœurs par processus
-  # Format: liste de listes [[core1, core2], [core3], ...]
+  # Répartition des cœurs par processus (1 thread/processus = 1 dossier Coeur)
+  # Processus N -> Dossier CoeurN -> Thread N-1
   cpu_affinity:
-    - [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]       # Processus 1 (10 threads)
-    - [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]  # Processus 2 (10 threads)
-    - [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]  # Processus 3 (10 threads)
+    - [0]   # Processus 1  -> Coeur1
+    - [1]   # Processus 2  -> Coeur2
+    - [2]   # Processus 3  -> Coeur3
+    - [3]   # Processus 4  -> Coeur4
+    - [4]   # Processus 5  -> Coeur5
+    - [5]   # Processus 6  -> Coeur6
+    - [6]   # Processus 7  -> Coeur7
+    - [7]   # Processus 8  -> Coeur8
+    - [8]   # Processus 9  -> Coeur9
+    - [9]   # Processus 10 -> Coeur10
+    - [10]  # Processus 11 -> Coeur11
+    - [11]  # Processus 12 -> Coeur12
+    - [12]  # Processus 13 -> Coeur13
+    - [13]  # Processus 14 -> Coeur14
+    - [14]  # Processus 15 -> Coeur15
+    - [15]  # Processus 16 -> Coeur16
+    - [16]  # Processus 17 -> Coeur17
+    - [17]  # Processus 18 -> Coeur18
+    - [18]  # Processus 19 -> Coeur19
+    - [19]  # Processus 20 -> Coeur20
+    - [20]  # Processus 21 -> Coeur21
+    - [21]  # Processus 22 -> Coeur22
+    - [22]  # Processus 23 -> Coeur23
+    - [23]  # Processus 24 -> Coeur24
+    - [24]  # Processus 25 -> Coeur25
+    - [25]  # Processus 26 -> Coeur26
+    - [26]  # Processus 27 -> Coeur27
+    - [27]  # Processus 28 -> Coeur28
+    - [28]  # Processus 29 -> Coeur29
+    - [29]  # Processus 30 -> Coeur30
   
   # Formats de sortie
   output_formats:
