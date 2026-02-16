@@ -100,6 +100,7 @@ qos:
   track_response_time: true      # Temps de réponse par fichier
   track_cpu_per_process: true    # Charge CPU par processus Whisper
   track_memory_per_process: true # Charge RAM par processus Whisper
+  track_io: true                 # Monitoring I/O disque (lecture/écriture)
   
   # Génération de rapports
   generate_graphs: true      # Générer les graphiques CPU/RAM

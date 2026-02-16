@@ -410,6 +410,15 @@ def main():
                 else:
                     logger.warning("⚠ Échec génération graphique RAM")
             
+            # Graphique I/O
+            io_file = Path(output_dir) / "monitoring_io.csv"
+            if io_file.exists():
+                logger.info("\nGénération du graphique I/O...")
+                if reporter.plot_io_usage(str(io_file)):
+                    logger.info("✓ Graphique I/O généré")
+                else:
+                    logger.warning("⚠ Échec génération graphique I/O")
+            
             # Graphique de consommation énergétique
             power_file = Path(output_dir) / "monitoring_power.csv"
             if power_file.exists() and config.get('qos', {}).get('power', {}).get('enabled', True):

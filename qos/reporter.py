@@ -316,6 +316,71 @@ class QoSReporter:
         except Exception as e:
             logger.error(f"Erreur génération graphique énergie: {str(e)}")
             return ""
+    
+    def plot_io_usage(
+        self, 
+        io_csv_file: str, 
+        output_file: Optional[str] = None
+    ) -> bool:
+        """
+        Génère un graphique de l'utilisation I/O disque.
+        
+        Args:
+            io_csv_file: Fichier CSV avec données I/O
+            output_file: Fichier de sortie PNG (optionnel)
+        
+        Returns:
+            True si succès, False sinon
+        """
+        try:
+            df = pd.read_csv(io_csv_file)
+            
+            if df.empty:
+                logger.warning("Fichier I/O vide")
+                return False
+            
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+            
+            # Graphique 1: Pourcentage I/O
+            ax1.plot(range(len(df)), df['IO_Usage_Percent'], color='#E85D04', linewidth=1.5)
+            ax1.fill_between(range(len(df)), df['IO_Usage_Percent'], alpha=0.3, color='#E85D04')
+            ax1.set_title('Utilisation I/O Disque (%) - Station TV', fontsize=14, fontweight='bold')
+            ax1.set_xlabel('Temps (échantillons)', fontsize=11)
+            ax1.set_ylabel('Utilisation I/O (%)', fontsize=11)
+            ax1.set_ylim(0, 100)
+            ax1.grid(True, alpha=0.3)
+            
+            mean_io = df['IO_Usage_Percent'].mean()
+            max_io = df['IO_Usage_Percent'].max()
+            ax1.axhline(y=mean_io, color='red', linestyle='--', label=f'Moyenne: {mean_io:.1f}%')
+            ax1.legend()
+            
+            # Graphique 2: Débit lecture/écriture (MB/s)
+            ax2.plot(range(len(df)), df['Read_MB_s'], color='#2196F3', linewidth=1.5, label='Lecture (MB/s)')
+            ax2.plot(range(len(df)), df['Write_MB_s'], color='#FF5722', linewidth=1.5, label='Écriture (MB/s)')
+            ax2.fill_between(range(len(df)), df['Read_MB_s'], alpha=0.2, color='#2196F3')
+            ax2.fill_between(range(len(df)), df['Write_MB_s'], alpha=0.2, color='#FF5722')
+            ax2.set_title('Débit I/O (MB/s) - Station TV', fontsize=14, fontweight='bold')
+            ax2.set_xlabel('Temps (échantillons)', fontsize=11)
+            ax2.set_ylabel('Débit (MB/s)', fontsize=11)
+            ax2.grid(True, alpha=0.3)
+            ax2.legend()
+            
+            if output_file is None:
+                output_file = self.output_dir / "io_usage.png"
+            
+            plt.tight_layout()
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logger.info(f"Graphique I/O généré: {output_file}")
+            logger.info(f"  I/O moyen: {mean_io:.1f}%, I/O max: {max_io:.1f}%")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la génération du graphique I/O: {str(e)}")
+            return False
 
 
 if __name__ == "__main__":
