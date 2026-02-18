@@ -4,6 +4,7 @@ Module principal de transcription audio basé sur Whisper.
 Adapté et amélioré depuis WhisperTranscriptor.py
 """
 
+import gc
 import time
 import os
 import torch
@@ -47,6 +48,9 @@ class WhisperTranscriber:
         self.transcription_csv = output_formats.get('csv', False)
         self.transcription_json = output_formats.get('json', False)
         
+        # Réduire les buffers de threads inter-op (doit être appelé une seule fois)
+        torch.set_num_interop_threads(1)
+        
         logger.info(f"WhisperTranscriber initialisé avec modèle={self.model_name}, langue={self.language}")
     
     def transcribe_on_specific_cores(
@@ -79,12 +83,15 @@ class WhisperTranscriber:
             logger.error(f"Impossible de charger le modèle {model_name}")
             return None
         
-        # Configurer PyTorch
+        # Configurer PyTorch pour minimiser la mémoire
         # Utiliser num_threads de la config si spécifié (pour benchmarks k=1)
         # Sinon, utiliser le nombre de cores
         num_threads = self.config.get('num_threads', len(cpu_cores))
         torch.set_num_threads(num_threads)
         logger.info(f"Threads PyTorch: {torch.get_num_threads()} (cores alloués: {len(cpu_cores)})")
+        
+        # Mode évaluation : désactive dropout et batchnorm tracking
+        model.eval()
         
         try:
             # Effectuer la transcription
@@ -93,14 +100,22 @@ class WhisperTranscriber:
             logger.info(f"Transcription de {audio_path} avec {model_name}...")
             start_time = time.time()
             
-            result = model.transcribe(
-                audio_path,
-                language=self.language,
-                word_timestamps=word_timestamps if self.transcription_srt else False
-            )
+            # inference_mode() est plus agressif que no_grad() :
+            # désactive les version counters et le view tracking,
+            # réduisant significativement les allocations mémoire internes
+            with torch.inference_mode():
+                result = model.transcribe(
+                    audio_path,
+                    language=self.language,
+                    word_timestamps=word_timestamps if self.transcription_srt else False
+                )
             
             elapsed_time = time.time() - start_time
             logger.info(f"Transcription terminée en {elapsed_time:.2f}s")
+            
+            # Libérer le cache PyTorch pour éviter l'accumulation mémoire
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             
             return result
             
@@ -191,7 +206,8 @@ class WhisperTranscriber:
         cpu_cores: List[int],
         core_index: int,
         tracker_path: Optional[str] = None,
-        run_number: Optional[int] = None
+        run_number: Optional[int] = None,
+        audio_duration: float = 0.0
     ) -> bool:
         """
         Lance la transcription et écrit les résultats dans les fichiers de sortie.
@@ -203,6 +219,7 @@ class WhisperTranscriber:
             core_index: Index du processus (pour tracking)
             tracker_path: Chemin du fichier tracker (optionnel)
             run_number: Numéro du run (optionnel, pour benchmark avec répétitions)
+            audio_duration: Durée audio en secondes (pour le tracker)
         
         Returns:
             True si succès, False sinon
@@ -259,12 +276,18 @@ class WhisperTranscriber:
         logger.info(f"Temps total d'exécution: {execution_time:.2f} secondes")
         
         # Écrire dans le tracker si spécifié
+        # Format: "filename: X.XX secondes (audio: Y.YY)" pour import_from_trackers()
         if tracker_path:
             try:
                 Path(tracker_path).parent.mkdir(parents=True, exist_ok=True)
                 with open(tracker_path, 'a', encoding='utf-8') as tracker:
-                    tracker.write(f"{base_name}: {execution_time:.2f} secondes\n")
+                    tracker.write(f"{base_name}: {execution_time:.2f} secondes (audio: {audio_duration:.2f})\n")
             except Exception as e:
                 logger.error(f"Erreur lors de l'écriture du tracker: {str(e)}")
+        
+        # Nettoyage mémoire explicite après traitement complet du fichier
+        # Whisper ne libère pas automatiquement les tenseurs intermédiaires
+        del result
+        gc.collect()
         
         return success

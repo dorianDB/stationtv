@@ -8,6 +8,7 @@ Usage:
 """
 
 import sys
+import gc
 import argparse
 import yaml
 import time
@@ -102,7 +103,8 @@ def process_audio_files_on_core(
                 audio.path,
                 cpu_cores,
                 core_index,
-                str(tracker_path)
+                str(tracker_path),
+                audio_duration=audio.duree
             )
             
             processing_time = time.time() - start_time
@@ -130,6 +132,10 @@ def process_audio_files_on_core(
                 logger.error("-" * 80)
                 logger.error(f"[ECHEC] Processus {core_index} | {filename}")
                 logger.error("=" * 80)
+            
+            # Forcer le nettoyage mémoire entre les fichiers
+            # Whisper accumule des tenseurs non libérés entre transcriptions
+            gc.collect()
                 
         except Exception as e:
             logger.error(f"Erreur lors du traitement de {audio.path}: {str(e)}")
@@ -381,6 +387,11 @@ def main():
         logger.info("\n" + "=" * 80)
         logger.info("TRAITEMENT TERMINÉ AVEC SUCCÈS")
         logger.info("=" * 80)
+        
+        # Réimporter les métriques depuis les fichiers trackers
+        # (les processus enfants ont leur propre copie de metrics_calculator)
+        trackers_dir = config.get('paths', {}).get('trackers_dir', 'trackers')
+        metrics_calculator.import_from_trackers(trackers_dir)
         
         # Afficher le résumé des métriques
         summary = metrics_calculator.get_summary()

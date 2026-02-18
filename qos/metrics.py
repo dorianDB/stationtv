@@ -240,3 +240,70 @@ class MetricsCalculator:
         logger.info(f"WER calculé: {wer*100:.2f}%")
         
         return wer
+
+    def import_from_trackers(self, trackers_dir: str):
+        """
+        Importe les métriques depuis les fichiers trackers générés par les processus.
+        Utile quand les objets MetricsCalculator ne sont pas partagés entre processus (multiprocessing).
+        
+        Args:
+            trackers_dir: Répertoire contenant les fichiers Tracker*.txt
+        """
+        import glob
+        import os
+        
+        tracker_files = glob.glob(os.path.join(trackers_dir, "Tracker*.txt"))
+        if not tracker_files:
+            logger.warning(f"Aucun fichier tracker trouvé dans {trackers_dir}")
+            return
+            
+        logger.info(f"Importation des métriques depuis {len(tracker_files)} fichiers trackers...")
+        
+        count = 0
+        for t_file in tracker_files:
+            try:
+                with open(t_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        # Format attendu: "filename: duration secondes" OU "filename: duration secondes (audio: duration)"
+                        # Exemple v1: "audio.mp3: 243.60 secondes"
+                        # Exemple v2: "audio.mp3: 243.60 secondes (audio: 300.00)"
+                        if "secondes" in line:
+                            try:
+                                # On sépare autour de "secondes" qui est notre ancre fiable
+                                # part_before: "audio.mp3: 243.60 "
+                                # part_after: " (audio: 300.00)" ou ""
+                                part_before, _, part_after = line.partition("secondes")
+                                
+                                # Dans part_before, on cherche le dernier ":" pour séparer fichier et temps
+                                if ":" in part_before:
+                                    filename_part, _, time_part = part_before.rpartition(":")
+                                    file_path = filename_part.strip()
+                                    processing_time = float(time_part.strip())
+                                else:
+                                    # Pas de deux points found? Cas étrange, on skip
+                                    continue
+                                
+                                # Extraction de la durée audio depuis part_after
+                                audio_duration = 0.0
+                                if "(audio:" in part_after:
+                                    try:
+                                        # " (audio: 300.00)" -> "300.00)" -> "300.00"
+                                        audio_str = part_after.split("(audio:")[1].strip().rstrip(")")
+                                        audio_duration = float(audio_str)
+                                    except ValueError:
+                                        pass
+                                
+                                self.add_transcription(
+                                    audio_duration=audio_duration,
+                                    processing_time=processing_time,
+                                    file_path=file_path,
+                                    model="unknown",
+                                    success=True
+                                )
+                                count += 1
+                            except ValueError:
+                                continue
+            except Exception as e:
+                logger.error(f"Erreur lecture tracker {t_file}: {e}")
+                
+        logger.info(f"Importé {count} transcriptions depuis les trackers.")
