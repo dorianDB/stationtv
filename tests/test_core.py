@@ -41,8 +41,8 @@ class TestModelManager(unittest.TestCase):
         """Vérifie l'estimation de RAM"""
         ram = self.manager.estimate_ram_usage("small", num_processes=2)
         self.assertGreater(ram, 0)
-        # Pour small (faster-whisper): 1 Go * 2 processus * 1.5 marge = 3 Go
-        self.assertEqual(ram, 3.0)
+        # Pour small: 2 Go * 2 processus * 1.5 marge = 6 Go
+        self.assertEqual(ram, 6.0)
     
     def test_validate_memory_availability(self):
         """Vérifie la validation de mémoire disponible"""
