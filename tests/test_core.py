@@ -12,6 +12,16 @@ import sys
 # Ajouter le répertoire parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Mock des modules non installés localement (whisper/torch) pour permettre l'import
+from unittest.mock import MagicMock
+
+# Créer un mock torch qui ne casse pas scipy
+_mock_torch = MagicMock()
+_mock_torch.Tensor = type('Tensor', (), {})  # Classe réelle pour issubclass()
+for mod in ['whisper', 'torch', 'torch.cuda']:
+    if mod not in sys.modules:
+        sys.modules[mod] = _mock_torch if 'torch' in mod else MagicMock()
+
 from core.models import ModelManager
 from core.affinity import CPUAffinityManager, Audio
 from qos.metrics import MetricsCalculator
