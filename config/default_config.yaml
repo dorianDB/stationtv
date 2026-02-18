@@ -200,5 +200,8 @@ batch:
   max_retries: 3
   retry_delay_seconds: 60
   
+  # Limites par processus
+  max_files_per_process: 0   # Nombre max de fichiers par processus (0 = illimité)
+  
   # Priorités
   sort_by_duration: true     # Trier par durée (algorithme glouton)

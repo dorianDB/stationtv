@@ -168,6 +168,13 @@ def lancer_traitement_batch(config: dict, metrics_calculator: MetricsCalculator)
     nb_processus = config.get('hardware', {}).get('max_parallel_processes', 3)
     logger.info(f"Nombre de processus parallèles: {nb_processus}")
     
+    # Limite de fichiers par processus
+    max_files_per_process = config.get('batch', {}).get('max_files_per_process', 0)
+    if max_files_per_process > 0:
+        logger.info(f"Limite de fichiers par processus: {max_files_per_process}")
+    else:
+        logger.info("Fichiers par processus: illimité")
+    
     # Regrouper les fichiers par dossier parent (Coeur1, Coeur2, ...)
     import re
     fichiers_par_dossier = {}
@@ -201,13 +208,17 @@ def lancer_traitement_batch(config: dict, metrics_calculator: MetricsCalculator)
         listes_audio = []
         for i, nom_dossier in enumerate(dossiers_tries):
             fichiers = fichiers_par_dossier[nom_dossier]
+            # Appliquer la limite max_files_per_process
+            if max_files_per_process > 0 and len(fichiers) > max_files_per_process:
+                logger.info(f"  {nom_dossier}: {len(fichiers)} fichiers trouvés, limité à {max_files_per_process}")
+                fichiers = fichiers[:max_files_per_process]
             duree_totale = sum(a.duree for a in fichiers) / 3600
             logger.info(f"  Processus {i+1} -> {nom_dossier} ({len(fichiers)} fichiers, {duree_totale:.1f}h)")
             listes_audio.append(fichiers)
     else:
         # Répartition classique avec algorithme glouton
         logger.info("Mode classique : équilibrage de charge par durée")
-        listes_audio = CPUAffinityManager.equilibrage_charge(liste_audios, nb_processus)
+        listes_audio = CPUAffinityManager.equilibrage_charge(liste_audios, nb_processus, max_per_list=max_files_per_process)
     
     # Configuration des cœurs CPU
     cpu_affinity = config.get('whisper', {}).get('cpu_affinity', [])

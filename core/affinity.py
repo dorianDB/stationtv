@@ -68,7 +68,7 @@ class CPUAffinityManager:
             return []
     
     @staticmethod
-    def glouton_n_listes(objets: List[Audio], n: int) -> List[List[Audio]]:
+    def glouton_n_listes(objets: List[Audio], n: int, max_per_list: int = 0) -> List[List[Audio]]:
         """
         Algorithme glouton pour répartir n objets dans n listes de manière équilibrée.
         Place chaque objet dans la liste avec la plus petite somme actuelle.
@@ -78,6 +78,7 @@ class CPUAffinityManager:
         Args:
             objets: Liste d'objets Audio à répartir
             n: Nombre de listes (processus) à créer
+            max_per_list: Nombre max de fichiers par liste (0 = illimité)
         
         Returns:
             Liste de n listes d'objets Audio
@@ -96,7 +97,19 @@ class CPUAffinityManager:
         # Répartir chaque objet dans la liste avec la plus petite somme
         for objet in objets_tries:
             # Trouver l'index de la liste avec la somme minimale
-            index_min = sommes.index(min(sommes))
+            # en respectant la limite max_per_list si définie
+            if max_per_list > 0:
+                # Filtrer les listes qui n'ont pas atteint la limite
+                indices_disponibles = [i for i in range(n) if len(listes[i]) < max_per_list]
+                if not indices_disponibles:
+                    logger.warning(
+                        f"Toutes les listes ont atteint la limite de {max_per_list} fichiers. "
+                        f"{len(objets_tries) - sum(len(l) for l in listes)} fichiers non assignés."
+                    )
+                    break
+                index_min = min(indices_disponibles, key=lambda i: sommes[i])
+            else:
+                index_min = sommes.index(min(sommes))
             
             # Ajouter l'objet à cette liste
             listes[index_min].append(objet)
@@ -112,7 +125,7 @@ class CPUAffinityManager:
         return listes
     
     @staticmethod
-    def equilibrage_charge(objets: List[Audio], nb_processus: int) -> List[List[Audio]]:
+    def equilibrage_charge(objets: List[Audio], nb_processus: int, max_per_list: int = 0) -> List[List[Audio]]:
         """
         Équilibre la charge entre les processus disponibles.
         Alias pour glouton_n_listes avec logging amélioré.
@@ -120,16 +133,19 @@ class CPUAffinityManager:
         Args:
             objets: Liste d'objets Audio à répartir
             nb_processus: Nombre de processus disponibles
+            max_per_list: Nombre max de fichiers par processus (0 = illimité)
         
         Returns:
             Liste de listes d'objets Audio répartis équitablement
         """
         logger.info(f"Équilibrage de {len(objets)} fichiers sur {nb_processus} processus")
+        if max_per_list > 0:
+            logger.info(f"Limite: {max_per_list} fichiers max par processus")
         
         duree_totale = sum(obj.duree for obj in objets)
         logger.info(f"Durée totale à traiter: {duree_totale:.2f}s ({duree_totale/3600:.2f}h)")
         
-        listes = CPUAffinityManager.glouton_n_listes(objets, nb_processus)
+        listes = CPUAffinityManager.glouton_n_listes(objets, nb_processus, max_per_list=max_per_list)
         
         # Calculer l'écart-type pour vérifier l'équilibre
         sommes = [sum(obj.duree for obj in liste) for liste in listes]
