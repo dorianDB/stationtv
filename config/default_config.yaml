@@ -7,7 +7,7 @@
 hardware:
   cpu_cores: 24              # Nombre de cœurs physiques
   cpu_threads: 36            # Nombre de threads disponibles (total machine: Xeon W-2295)
-  max_parallel_processes: 30 # Nombre max de processus Whisper simultanés (1 par dossier Coeur)
+  max_parallel_processes: 1 # Nombre max de processus Whisper simultanés (1 par dossier Coeur)
   ram_total_gb: 256          # RAM totale installée (Dell Precision 5820)
   ram_max_usage_percent: 90  # Utilisation RAM maximale autorisée (%)
 
@@ -149,27 +149,28 @@ export:
 # ========================================
 paths:
   # Répertoire de base (à adapter selon l'environnement)
-  base_dir: "C:/Users/Dorian/Desktop/stationtv"
+  base_dir: "."
   
   # Entrées
   input_audio_dir: "C:/Users/Dorian/Documents/Perso/PRI/StationTV/app/bdd"     # Base de données audio TNT
   
   # Sorties
-  output_dir: "C:/Users/Dorian/Desktop/stationtv/test_output"       # Répertoire de sortie principal
-  transcriptions_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/transcriptions"
-  reports_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/reports"
-  logs_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/logs"
-  trackers_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/trackers"
+  # Sorties
+  output_dir: "test_output"       # Répertoire de sortie principal
+  transcriptions_dir: "test_output/transcriptions"
+  reports_dir: "test_output/reports"
+  logs_dir: "test_output/logs"
+  trackers_dir: "test_output/trackers"
   
   # Temporaire
-  temp_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/temp"
-  preprocessed_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/temp/preprocessed"
+  temp_dir: "test_output/temp"
+  preprocessed_dir: "test_output/temp/preprocessed"
   
   # Sauvegarde
-  backup_dir: "C:/Users/Dorian/Desktop/stationtv/test_output/backup"
+  backup_dir: "test_output/backup"
   
   # CSV de travail
-  csv_filename: "C:/Users/Dorian/Desktop/stationtv/fichiers_audio.csv"
+  csv_filename: "fichiers_audio.csv"
 
 # ========================================
 # LOGGING
