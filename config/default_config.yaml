@@ -15,7 +15,7 @@ hardware:
 # CONFIGURATION WHISPER
 # ========================================
 whisper:
-  model: "medium"            # Modèle: tiny, base, small, medium, large
+  model: "base"            # Modèle: tiny, base, small, medium, large
   language: "fr"             # Langue principale (français)
   device: "cpu"              # cpu ou cuda (GPU désactivé pour stabilité)
   
@@ -200,7 +200,7 @@ batch:
   retry_delay_seconds: 60
   
   # Limites par processus
-  max_files_per_process: 0   # Nombre max de fichiers par processus (0 = illimité)
+  max_files_per_process: 1   # Nombre max de fichiers par processus (0 = illimité)
   
   # Priorités
   sort_by_duration: true     # Trier par durée (algorithme glouton)

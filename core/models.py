@@ -35,7 +35,8 @@ class ModelManager:
             device: Device à utiliser ('cpu' ou 'cuda')
         """
         self.device = device
-        self._loaded_models: Dict[str, whisper.Whisper] = {}
+        self.device = device
+        # self._loaded_models removed to prevent caching
         
         logger.info(f"ModelManager initialisé avec device={device}")
     
@@ -45,16 +46,11 @@ class ModelManager:
         
         Args:
             model_name: Nom du modèle (tiny, base, small, medium, large)
-            force_reload: Forcer le rechargement même si déjà en cache
+            force_reload: Ignoré (plus de cache)
         
         Returns:
             Modèle Whisper chargé ou None en cas d'erreur
         """
-        # Vérifier si le modèle est déjà chargé
-        if model_name in self._loaded_models and not force_reload:
-            logger.info(f"Modèle {model_name} déjà chargé (cache)")
-            return self._loaded_models[model_name]
-        
         # Valider le nom du modèle
         if model_name not in self.MODEL_SPECS:
             logger.error(f"Modèle inconnu: {model_name}. Modèles disponibles: {list(self.MODEL_SPECS.keys())}")
@@ -64,9 +60,6 @@ class ModelManager:
             logger.info(f"Chargement du modèle {model_name} sur {self.device}...")
             model = whisper.load_model(model_name, device=self.device)
             
-            # Mettre en cache
-            self._loaded_models[model_name] = model
-            
             logger.info(f"Modèle {model_name} chargé avec succès")
             return model
             
@@ -74,31 +67,34 @@ class ModelManager:
             logger.error(f"Erreur lors du chargement du modèle {model_name}: {str(e)}")
             return None
     
-    def unload_model(self, model_name: str) -> bool:
+    def unload_model(self, model: Optional[whisper.Whisper]) -> bool:
         """
         Décharge un modèle de la mémoire.
         
         Args:
-            model_name: Nom du modèle à décharger
+            model: Instance du modèle à décharger
         
         Returns:
-            True si succès, False sinon
+            True si succès
         """
-        if model_name in self._loaded_models:
-            del self._loaded_models[model_name]
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
-            logger.info(f"Modèle {model_name} déchargé")
+        if model:
+            del model
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            logger.info(f"Modèle déchargé et garbage collector appelé")
             return True
-        else:
-            logger.warning(f"Modèle {model_name} non trouvé dans le cache")
-            return False
-    
+        return False
+
     def unload_all(self):
-        """Décharge tous les modèles de la mémoire."""
-        model_names = list(self._loaded_models.keys())
-        for name in model_names:
-            self.unload_model(name)
-        logger.info("Tous les modèles ont été déchargés")
+        """Décharge tous les modèles de la mémoire (Obsolète avec la nouvelle gestion)."""
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        logger.info("Nettoyage mémoire forcé")
     
     def get_model_suffix(self, model_name: str) -> str:
         """

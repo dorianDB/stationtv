@@ -3,19 +3,12 @@ Station TV - QoS Reporter
 Génération de rapports et graphiques de performance
 """
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
 from pathlib import Path
 from typing import Dict, Optional
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Style des graphiques
-sns.set_style("whitegrid")
-plt.rcParams['figure.figsize'] = (12, 6)
 
 
 class QoSReporter:
@@ -34,6 +27,19 @@ class QoSReporter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"QoSReporter initialisé (output_dir={output_dir})")
+
+    def _setup_plotting(self):
+        """Charge les librairies graphiques uniquement au besoin."""
+        global pd, plt, mdates, sns
+        if 'pd' not in globals():
+            import pandas as pd
+            import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
+            import seaborn as sns
+            
+            # Style des graphiques
+            sns.set_style("whitegrid")
+            plt.rcParams['figure.figsize'] = (12, 6)
     
     def plot_cpu_usage(
         self, 
@@ -50,7 +56,9 @@ class QoSReporter:
         Returns:
             True si succès, False sinon
         """
+        self._setup_plotting()
         try:
+
             # Lire les données
             df = pd.read_csv(cpu_csv_file)
             
@@ -107,6 +115,7 @@ class QoSReporter:
         Returns:
             True si succès, False sinon
         """
+        self._setup_plotting()
         try:
             # Lire les données
             df = pd.read_csv(memory_csv_file)
@@ -237,6 +246,7 @@ class QoSReporter:
         Returns:
             Chemin du fichier PNG généré
         """
+        self._setup_plotting()
         try:
             # Lire les données
             df = pd.read_csv(csv_file)
@@ -332,6 +342,7 @@ class QoSReporter:
         Returns:
             True si succès, False sinon
         """
+        self._setup_plotting()
         try:
             df = pd.read_csv(io_csv_file)
             

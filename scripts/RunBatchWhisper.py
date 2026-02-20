@@ -24,7 +24,7 @@ from core.affinity import CPUAffinityManager, Audio
 from qos.monitor import SystemMonitor
 from qos.metrics import MetricsCalculator
 from qos.power_monitor import PowerMonitor
-from qos.reporter import QoSReporter
+from qos.power_monitor import PowerMonitor
 from utils.logger import setup_logger
 from utils.file_handler import FileHandler
 
@@ -412,6 +412,7 @@ def main():
             logger.info("=" * 80)
             
             output_dir = config.get('paths', {}).get('reports_dir', 'output/reports')
+            from qos.reporter import QoSReporter
             reporter = QoSReporter(output_dir=output_dir)
             
             # Graphique CPU

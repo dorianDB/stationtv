@@ -113,15 +113,15 @@ class WhisperTranscriber:
             elapsed_time = time.time() - start_time
             logger.info(f"Transcription terminée en {elapsed_time:.2f}s")
             
-            # Libérer le cache PyTorch pour éviter l'accumulation mémoire
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            
             return result
             
         except Exception as e:
             logger.error(f"Erreur lors de la transcription de {audio_path}: {str(e)}")
             return None
+        finally:
+            # Libération explicite du modèle (puisqu'il n'est plus mis en cache)
+            if model:
+                self.model_manager.unload_model(model)
     
     @staticmethod
     def format_timestamp_srt(seconds: float) -> str:

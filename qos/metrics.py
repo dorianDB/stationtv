@@ -4,7 +4,6 @@ Calcul des métriques QoS (throughput, WER, temps de traitement, etc.)
 """
 
 import time
-import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional
 from utils.logger import get_logger
@@ -184,6 +183,7 @@ class MetricsCalculator:
             True si succès, False sinon
         """
         try:
+            import pandas as pd
             Path(output_file).parent.mkdir(parents=True, exist_ok=True)
             
             df = pd.DataFrame(self.transcriptions)
